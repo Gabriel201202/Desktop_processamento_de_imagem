@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request
 import cv2
 import numpy as np
-from scipy import stats
+from scipy import ndimage
 
 app = Flask(__name__)
 
@@ -9,10 +9,25 @@ INPUT_IMAGE = "static/pessoa.jpg"
 OUTPUT_IMAGE = "static/output.jpg"
 
 
+def filtro_moda(img, k):
+    def moda(vetor):
+        vetor = vetor.astype(np.uint8)
+        hist = np.bincount(vetor)
+        return np.argmax(hist)
+
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    mod = ndimage.generic_filter(img_gray, moda, size=k)
+    return cv2.cvtColor(mod, cv2.COLOR_GRAY2BGR)
+
+
 def aplicar_filtro(filtro, k):
+
     img = cv2.imread(INPUT_IMAGE)
 
-    # Kernel deve ser ímpar
+    if img is None:
+        print("Erro ao abrir a imagem.")
+        return
+
     if k % 2 == 0:
         k += 1
 
@@ -26,17 +41,12 @@ def aplicar_filtro(filtro, k):
         img_filtrada = cv2.medianBlur(img, k)
 
     elif filtro == "moda":
-        img_filtrada = img.copy()
-        h, w, c = img.shape
-        
-        offset = k // 2
+        img_filtrada = filtro_moda(img, k)
 
-        for y in range(offset, h - offset):
-            for x in range(offset, w - offset):
-                for ch in range(c):
-                    janela = img[y-offset:y+offset+1, x-offset:x+offset+1, ch].flatten()
-                    moda = stats.mode(janela, keepdims=True)[0][0]
-                    img_filtrada[y, x, ch] = moda
+    elif filtro == "laplaciano":
+        lap = cv2.Laplacian(img, cv2.CV_64F, ksize=k)
+        img_filtrada = np.uint8(np.absolute(lap))
+
 
     else:
         img_filtrada = img
@@ -60,4 +70,4 @@ def processar():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
